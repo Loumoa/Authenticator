@@ -1,9 +1,9 @@
 package fr.loumoa.authenticator.controller;
 
-import fr.loumoa.authenticator.model.ERole;
 import fr.loumoa.authenticator.model.Role;
 import fr.loumoa.authenticator.model.User;
 import fr.loumoa.authenticator.payload.request.LoginRequest;
+import fr.loumoa.authenticator.payload.request.RolesRequest;
 import fr.loumoa.authenticator.payload.request.SignupRequest;
 import fr.loumoa.authenticator.payload.response.JwtResponse;
 import fr.loumoa.authenticator.payload.response.MessageResponse;
@@ -12,6 +12,7 @@ import fr.loumoa.authenticator.repository.RoleRepository;
 import fr.loumoa.authenticator.repository.UserRepository;
 import fr.loumoa.authenticator.security.jwt.JwtUtils;
 import fr.loumoa.authenticator.security.services.UserDetailsImpl;
+import fr.loumoa.authenticator.util.RoleUtil;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -24,7 +25,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Base64;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -89,41 +89,7 @@ public class AuthController {
                 signUpRequest.getEmail(),
                 encoder.encode(signUpRequest.getPassword()));
 
-        Set<String> strRoles = signUpRequest.getRole();
-        Set<Role> roles = new HashSet<>();
-
-        if (strRoles == null) {
-            Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                    .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-            roles.add(userRole);
-        } else {
-            strRoles.forEach(role -> {
-                switch (role) {
-                    case "admin":
-                        Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(adminRole);
-
-                        break;
-                    case "proprio":
-                        Role proprioRole = roleRepository.findByName(ERole.ROLE_PROPRIO)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(proprioRole);
-
-                        break;
-                    case "loc":
-                        Role locRole = roleRepository.findByName(ERole.ROLE_LOCATAIRE)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(locRole);
-
-                        break;
-                    default:
-                        Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(userRole);
-                }
-            });
-        }
+        Set<Role> roles = RoleUtil.adaptRoles(signUpRequest.getRole(), roleRepository);
 
         user.setRoles(roles);
         userRepository.save(user);
@@ -136,5 +102,20 @@ public class AuthController {
         return ResponseEntity.ok(new TokenResponse(
                 Base64.getEncoder().encodeToString(jwtUtils.getPublicKey().getEncoded())
         ));
+    }
+
+    @PutMapping(value = "/{userId}/roles")
+    public ResponseEntity<?> updateRoles(@PathVariable("userId") String userId,
+                                         @Valid @RequestBody RolesRequest rolesStr){
+        if (! userRepository.existsById(Long.parseLong(userId))){
+            return  ResponseEntity.badRequest().body("Error : id not found");
+        }
+
+        Set<Role> roles = RoleUtil.adaptRoles(rolesStr.getRole(), roleRepository);
+        User user = userRepository.findById(Long.parseLong(userId))
+                .orElseThrow();
+        user.setRoles(roles);
+        userRepository.save(user);
+        return ResponseEntity.ok("");
     }
 }

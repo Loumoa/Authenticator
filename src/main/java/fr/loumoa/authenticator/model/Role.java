@@ -7,15 +7,14 @@ import lombok.*;
 @Table(name = "roles")
 @NoArgsConstructor(force = true)
 @RequiredArgsConstructor
+@Data
 public class Role {
     @Id
     @GeneratedValue()
-    @Setter@Getter
     private Integer id;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     @NonNull
-    @Setter@Getter
     private ERole name;
 }
